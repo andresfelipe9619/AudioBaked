@@ -10,6 +10,7 @@ console = Console()
 
 # === ENVIRONMENT CONFIG ===
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+SYSTEM_PROMPT = os.getenv("OPENAI_SYSTEM_PROMPT", "You are a helpful assistant. Analyze the following transcript.")
 
 
 def extract_audio(video_path, output_dir):
@@ -23,7 +24,7 @@ def extract_audio(video_path, output_dir):
         "-q:a", "0",
         "-map", "a",
         audio_path,
-        "-y"  # overwrite without asking
+        "-y"
     ], check=True)
 
     console.print(f"✅ [bold green]Audio saved to:[/bold green] {audio_path}")
@@ -46,7 +47,7 @@ def transcribe(file_path, model_size):
             txt_file.write(f"{text}\n")
 
     console.print(f"✅ [bold green]Transcript saved to {srt_path} and {txt_path}[/bold green]")
-    return srt_path, txt_path, result['text']
+    return srt_path, txt_path, result['text'], basename
 
 
 def format_time(seconds):
@@ -65,13 +66,13 @@ def burn_subtitles(video_path, srt_path, output_dir=None):
     console.print("🔥 [bold orange3]Burning subtitles with ffmpeg...[/bold orange3]")
     subprocess.run([
         "ffmpeg", "-i", video_path, "-vf", f"subtitles={srt_path}", "-c:a", "copy", output_path
-    ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)  # Hide ffmpeg output
+    ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     console.print(f"🎬 [bold green]Final video:[/bold green] {output_path}")
     return output_path
 
 
-def analyze_transcript(text):
+def analyze_transcript(text, basename, output_dir):
     if not OPENAI_API_KEY:
         console.print("⚠️ [bold yellow]OPENAI_API_KEY not set. Skipping analysis.[/bold yellow]")
         return
@@ -79,30 +80,27 @@ def analyze_transcript(text):
     console.print("🤖 [bold cyan]Sending transcript to OpenAI for analysis...[/bold cyan]")
     openai.api_key = OPENAI_API_KEY
 
-    system_prompt = """You are a top-tier business analyst and project manager. Your task is to analyze the following transcript and extract key information for a freelancer.
-
-Please provide the following, based on the content of the conversation:
-
-1.  **General Notes:** A summary of the key topics discussed, decisions made, and important information mentioned.
-2.  **Action Items:** A clear list of tasks that need to be completed, with assigned owners if mentioned.
-3.  **Freelancer's To-Do List:** A specific, actionable list of tasks for the freelancer based on the conversation.
-4.  **Estimated Time & Budget:** A clever and realistic estimation of the time (in hours or days) and budget required for the project discussed. If not explicitly mentioned, provide a reasonable estimate based on the scope of work.
-
-Format the output in Markdown.
-"""
-
     response = openai.ChatCompletion.create(
         model="gpt-4",
         messages=[
-            {"role": "system", "content": system_prompt},
+            {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": f"Analyze this transcript:\n\n{text[:8000]}"}
         ]
     )
 
+    analysis = response.choices[0].message.content
+
     console.print("🧠 [bold magenta]Analysis Result:[/bold magenta]")
     console.print(f"[dim]{'-' * 40}[/dim]")
-    console.print(response.choices[0].message.content)
+    console.print(analysis)
     console.print(f"[dim]{'-' * 40}[/dim]")
+
+    # Save to markdown file
+    report_path = os.path.join(output_dir, f"{basename}_analysis.md")
+    with open(report_path, "w", encoding="utf-8") as f:
+        f.write(analysis)
+
+    console.print(f"💾 [bold green]Analysis saved to:[/bold green] {report_path}")
 
 
 def main():
@@ -117,13 +115,12 @@ def main():
     parser.add_argument("--output-dir", default=".", help="Directory for output files")
 
     args = parser.parse_args()
-
     input_path = args.file
 
     if args.extract_audio:
         input_path = extract_audio(args.file, args.output_dir)
 
-    srt_path, txt_path, transcript = transcribe(input_path, args.model)
+    srt_path, txt_path, transcript, basename = transcribe(input_path, args.model)
 
     if args.export_only:
         console.print("🗃️ [yellow]Export-only mode enabled. Skipping video rendering.[/yellow]")
@@ -131,7 +128,7 @@ def main():
         burn_subtitles(args.file, srt_path, args.output_dir)
 
     if args.analyze:
-        analyze_transcript(transcript)
+        analyze_transcript(transcript, basename, args.output_dir)
 
 
 if __name__ == "__main__":
