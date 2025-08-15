@@ -2,7 +2,9 @@ import os
 import argparse
 import subprocess
 import whisper
-import openai
+from openai import OpenAI
+
+client = OpenAI(api_key=OPENAI_API_KEY)
 from rich.console import Console
 from dotenv import load_dotenv
 
@@ -81,15 +83,12 @@ def analyze_transcript(text, basename, output_dir):
         return
 
     console.print("🤖 [bold cyan]Sending transcript to OpenAI for analysis...[/bold cyan]")
-    openai.api_key = OPENAI_API_KEY
 
-    response = openai.ChatCompletion.create(
-        model="gpt-4",
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": f"Analyze this transcript:\n\n{text[:8000]}"}
-        ]
-    )
+    response = client.chat.completions.create(model="gpt-4",
+    messages=[
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": f"Analyze this transcript:\n\n{text[:8000]}"}
+    ])
 
     analysis = response.choices[0].message.content
 
