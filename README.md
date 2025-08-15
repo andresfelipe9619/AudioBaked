@@ -23,13 +23,14 @@ business analysis with simple flags.
     - **Action Items**
     - **A Freelancer's To-Do List**
     - **Estimated Time & Budget**
+- **📄 Analyze Existing Transcripts:** You can analyze any existing `.txt` file using the `--analyze-transcript` flag.
 - **🎬 Multiple Output Modes:**
     - **`--burn`**: Burn subtitles directly into your original video file using `ffmpeg`.
     - **`--export-only`**: Save `.srt` and `.txt` transcript files without creating a new video.
 - **⚙️ Flexible & Controllable:**
     - **`--model`**: Select the Whisper model size (`tiny`, `base`, `small`, `medium`, `large`) to balance speed and
       accuracy.
-    - **`--output-dir`**: Specify a custom directory for all output files.
+    - **`--output-dir`**: Specify a custom directory for all output files. Subdirectories are created per file.
 
 ---
 
@@ -79,7 +80,7 @@ pip install -r requirements.txt
 Alternatively, you can install the packages manually:
 
 ```bash
-pip install openai-whisper openai
+pip install openai-whisper openai python-dotenv rich
 ```
 
 ---
@@ -93,9 +94,17 @@ To use the `--analyze` feature, you must set your OpenAI API key as an environme
 Create a `.env` file in the project's root directory and add your key:
 
 ```
-OPENAI_API_KEY="sk-xxxxxx..."```
+OPENAI_API_KEY="sk-xxxxxx..."
+```
+
+You can also optionally override the system prompt used for GPT analysis:
+
+```
+OPENAI_SYSTEM_PROMPT="Your custom analysis instructions here."
+```
 
 Alternatively, you can export the variable directly in your terminal session before running the script:
+
 ```bash
 export OPENAI_API_KEY="sk-xxxxxx..."
 ```
@@ -108,15 +117,16 @@ AudioBaked is controlled via command-line flags, allowing you to specify exactly
 
 ### Command-Line Arguments
 
-| Flag              | Description                                                        | Default      |
-| :---------------- | :----------------------------------------------------------------- | :----------- |
-| `file`            | (Required) Path to the input video or audio file.                  | N/A          |
-| `--extract-audio` | Extract audio from video to an `.mp3` before processing.           | Off          |
-| `--burn`          | Burn subtitles into the video. (Ignored if `--extract-audio` is used).| Off          |
-| `--export-only`   | Only export the transcript files (`.srt`, `.txt`).                 | Off          |
-| `--analyze`       | Send transcript to OpenAI for detailed business analysis.          | Off          |
-| `--model`         | The Whisper model to use (tiny, base, small, medium, large).       | `medium`     |
-| `--output-dir`    | The directory where output files will be saved.                    | Current dir `.` |
+| Flag                   | Description                                                            | Default    |
+|------------------------|------------------------------------------------------------------------|------------|
+| `file`                 | (Required) Path to the input video or audio file.                      | N/A        |
+| `--extract-audio`      | Extract audio from video to an `.mp3` before processing.               | Off        |
+| `--burn`               | Burn subtitles into the video. (Ignored if `--extract-audio` is used). | Off        |
+| `--export-only`        | Only export the transcript files (`.srt`, `.txt`).                     | Off        |
+| `--analyze`            | Send transcript to OpenAI for detailed business analysis.              | Off        |
+| `--model`              | The Whisper model to use (`tiny`, `base`, `small`, `medium`, `large`). | `medium`   |
+| `--output-dir`         | The directory where output files will be saved.                        | `./output` |
+| `--analyze-transcript` | Analyze a `.txt` transcript file directly (skips transcription step).  | Off        |
 
 ### Examples
 
@@ -127,7 +137,6 @@ python main.py my_video.mp4 --burn
 ```
 
 **2. Extract audio from a video, then generate transcripts and a business analysis:**
-This is efficient as Whisper only processes the audio file.
 
 ```bash
 python main.py my_client_call.mp4 --extract-audio --analyze
@@ -151,15 +160,21 @@ python main.py my_presentation.mov --burn --analyze
 python main.py my_clip.mp4 --export-only --model small --output-dir ./exports
 ```
 
+**6. Analyze an existing transcript file only (no media processing):**
+
+```bash
+python main.py dummy --analyze-transcript ./transcripts/meeting_notes.txt
+```
+
 ### 🧾 Output Files
 
-Based on the flags you use, the following files may be created:
+Based on the flags you use, the following files may be created inside an output subfolder:
 
 - `yourfile.mp3`: The extracted audio file (created with `--extract-audio`).
 - `yourfile.srt`: A standard subtitle file.
 - `yourfile.txt`: A plain text version of the transcript.
 - `yourfile_subtitled.mp4`: The final video with burned-in subtitles (created with `--burn`).
-- **Analysis from GPT** will be printed directly to your terminal (created with `--analyze`).
+- `yourfile_analysis.md`: Markdown report from GPT (created with `--analyze`).
 
 ---
 
@@ -167,9 +182,9 @@ Based on the flags you use, the following files may be created:
 
 ```
 audiobaked/
-├── main.py   # Main executable script
-├── requirements.txt            # Python package dependencies
-└── README.md                   # You are here
+├── main.py                    # Main executable script
+├── requirements.txt           # Python package dependencies
+└── README.md                  # You are here
 ```
 
 ---
@@ -186,10 +201,11 @@ audiobaked/
 
 ## 💬 Future Ideas
 
--   [ ] Implement transcript chunking for deeper GPT analysis of long files.
--   [ ] Develop a simple web UI for easy drag-and-drop functionality.
--   [ ] Add a command-line flag to specify the transcription language.
--   [ ] Provide an option to save the GPT analysis to a Markdown file.
+- [x] Implement transcript chunking for deeper GPT analysis of long files.
+- [x] Provide an option to save the GPT analysis to a Markdown file.
+- [x] Add `--analyze-transcript` to analyze existing files.
+- [ ] Develop a simple web UI for easy drag-and-drop functionality.
+- [ ] Add a command-line flag to specify the transcription language.
 
 ---
 
