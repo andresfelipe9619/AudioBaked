@@ -2,22 +2,34 @@
 
 > Transcribe, analyze, and subtitle your audio & video files directly from the command line.
 
-**AudioBaked** is a powerful and flexible Python tool for automated transcription and intelligent analysis of your media files. It leverages the cutting-edge accuracy of [OpenAI's Whisper](https://github.com/openai/whisper) to generate transcripts and can optionally use OpenAI's GPT models to provide insightful analysis. With its new CLI interface, you can choose to burn subtitles, export transcripts, or run analysis with simple flags.
+**AudioBaked** is a powerful and flexible Python tool for automated transcription and intelligent analysis of your media
+files. It leverages the cutting-edge accuracy of [OpenAI's Whisper](https://github.com/openai/whisper) to generate
+transcripts and can optionally use OpenAI's GPT models to provide insightful, structured analysis.
+
+With its modular CLI interface, you can choose to extract audio, burn subtitles, export transcripts, or run a detailed
+business analysis with simple flags.
 
 ---
 
 ## ✨ Features
 
 - **🎙️ Broad File Support:** Works seamlessly with `.mp4`, `.mov`, `.mp3`, and other common audio/video formats.
+- **🎧 Audio Extraction:** Includes a new `--extract-audio` flag to pull the audio from a video file into a separate
+  `.mp3` for faster processing.
 - **🤖 High-Quality Transcription:** Utilizes OpenAI Whisper for accurate speech-to-text conversion.
-- **🧠 Intelligent Analysis:** Optionally sends transcripts to an OpenAI GPT model for summarization or key insight extraction.
+- **🧠 Advanced Business Analysis:** When using the `--analyze` flag, the transcript is sent to a GPT model with a
+  specialized prompt to extract:
+    - **General Notes & Summaries**
+    - **Action Items**
+    - **A Freelancer's To-Do List**
+    - **Estimated Time & Budget**
 - **🎬 Multiple Output Modes:**
-    - **`--burn`**: Burn subtitles directly into your video using `ffmpeg`.
+    - **`--burn`**: Burn subtitles directly into your original video file using `ffmpeg`.
     - **`--export-only`**: Save `.srt` and `.txt` transcript files without creating a new video.
 - **⚙️ Flexible & Controllable:**
-    - **`--model`**: Select the Whisper model size (`tiny`, `base`, `small`, `medium`, `large`) to balance speed and accuracy.
+    - **`--model`**: Select the Whisper model size (`tiny`, `base`, `small`, `medium`, `large`) to balance speed and
+      accuracy.
     - **`--output-dir`**: Specify a custom directory for all output files.
-- **🐍 Simple & Scriptable:** A straightforward Python script perfect for command-line use and automation.
 
 ---
 
@@ -34,6 +46,7 @@
 **1. Clone the Repository**
 
 First, clone this repository to your local machine and navigate into the directory.
+
 ```bash
 git clone https://github.com/yourusername/audiobaked.git
 cd audiobaked
@@ -43,25 +56,28 @@ cd audiobaked
 
 Using a virtual environment prevents conflicts with other Python projects.
 
-*   **macOS/Linux:**
-    ```bash
-    python -m venv .venv
-    source .venv/bin/activate
-    ```
+* **macOS/Linux:**
+  ```bash
+  python -m venv .venv
+  source .venv/bin/activate
+  ```
 
-*   **Windows:**
-    ```bash
-    python -m venv .venv
-    .venv\Scripts\activate
-    ```
+* **Windows:**
+  ```bash
+  python -m venv .venv
+  .venv\Scripts\activate
+  ```
 
 **3. Install Dependencies**
 
 Install the required Python libraries from the `requirements.txt` file.
+
 ```bash
 pip install -r requirements.txt
 ```
+
 Alternatively, you can install the packages manually:
+
 ```bash
 pip install openai-whisper openai
 ```
@@ -75,9 +91,9 @@ pip install openai-whisper openai
 To use the `--analyze` feature, you must set your OpenAI API key as an environment variable.
 
 Create a `.env` file in the project's root directory and add your key:
+
 ```
-OPENAI_API_KEY="sk-xxxxxx..."
-```
+OPENAI_API_KEY="sk-xxxxxx..."```
 
 Alternatively, you can export the variable directly in your terminal session before running the script:
 ```bash
@@ -88,53 +104,62 @@ export OPENAI_API_KEY="sk-xxxxxx..."
 
 ## 🚀 Usage
 
-AudioBaked is now controlled via command-line flags, allowing you to specify exactly what tasks to perform.
+AudioBaked is controlled via command-line flags, allowing you to specify exactly what tasks to perform.
 
 ### Command-Line Arguments
 
-| Flag           | Description                                                        | Default      |
-| :------------- | :----------------------------------------------------------------- | :----------- |
-| `file`         | (Required) Path to the input video or audio file.                  | N/A          |
-| `--burn`       | Burn the generated subtitles into the video.                       | Off          |
-| `--export-only`| Only export the transcript files (`.srt`, `.txt`).                 | Off          |
-| `--analyze`    | Send the transcript to OpenAI's GPT for analysis.                  | Off          |
-| `--model`      | The Whisper model to use (tiny, base, small, medium, large).       | `medium`     |
-| `--output-dir` | The directory where output files will be saved.                    | Current dir `.` |
+| Flag              | Description                                                        | Default      |
+| :---------------- | :----------------------------------------------------------------- | :----------- |
+| `file`            | (Required) Path to the input video or audio file.                  | N/A          |
+| `--extract-audio` | Extract audio from video to an `.mp3` before processing.           | Off          |
+| `--burn`          | Burn subtitles into the video. (Ignored if `--extract-audio` is used).| Off          |
+| `--export-only`   | Only export the transcript files (`.srt`, `.txt`).                 | Off          |
+| `--analyze`       | Send transcript to OpenAI for detailed business analysis.          | Off          |
+| `--model`         | The Whisper model to use (tiny, base, small, medium, large).       | `medium`     |
+| `--output-dir`    | The directory where output files will be saved.                    | Current dir `.` |
 
 ### Examples
 
 **1. Transcribe a video and burn subtitles:**
+
 ```bash
-python transcribe_and_analyze.py my_video.mp4 --burn
+python main.py my_video.mp4 --burn
 ```
 
-**2. Export transcript files for an audio podcast (no video output):**
+**2. Extract audio from a video, then generate transcripts and a business analysis:**
+This is efficient as Whisper only processes the audio file.
+
 ```bash
-python transcribe_and_analyze.py my_podcast.mp3 --export-only
+python main.py my_client_call.mp4 --extract-audio --analyze
 ```
 
-**3. Transcribe and get a summary from OpenAI (no video output):**
+**3. Export transcript files for an audio podcast (no video output):**
+
 ```bash
-python transcribe_and_analyze.py my_meeting.mp4 --analyze
+python main.py my_podcast.mp3 --export-only
 ```
 
-**4. Do everything: burn subtitles and get an analysis:**
+**4. Do everything: burn subtitles and get an analysis from a video file:**
+
 ```bash
-python transcribe_and_analyze.py my_presentation.mov --burn --analyze
+python main.py my_presentation.mov --burn --analyze
 ```
 
 **5. Use a smaller model for speed and save to a specific folder:**
+
 ```bash
-python transcribe_and_analyze.py my_clip.mp4 --burn --model small --output-dir ./exports
+python main.py my_clip.mp4 --export-only --model small --output-dir ./exports
 ```
 
 ### 🧾 Output Files
 
 Based on the flags you use, the following files may be created:
--   `yourfile.srt`: A standard subtitle file.
--   `yourfile.txt`: A plain text version of the transcript.
--   `yourfile_subtitled.mp4`: The final video with burned-in subtitles (created with `--burn`).
--   Analysis from GPT will be printed directly to your terminal (created with `--analyze`).
+
+- `yourfile.mp3`: The extracted audio file (created with `--extract-audio`).
+- `yourfile.srt`: A standard subtitle file.
+- `yourfile.txt`: A plain text version of the transcript.
+- `yourfile_subtitled.mp4`: The final video with burned-in subtitles (created with `--burn`).
+- **Analysis from GPT** will be printed directly to your terminal (created with `--analyze`).
 
 ---
 
@@ -142,7 +167,7 @@ Based on the flags you use, the following files may be created:
 
 ```
 audiobaked/
-├── transcribe_and_analyze.py   # Main executable script
+├── main.py   # Main executable script
 ├── requirements.txt            # Python package dependencies
 └── README.md                   # You are here
 ```
@@ -151,9 +176,11 @@ audiobaked/
 
 ## 💡 Tips & Notes
 
--   **GPU Acceleration:** For significantly faster processing, ensure you have CUDA installed to enable GPU acceleration for the Whisper models.
--   **Processing Time:** Transcribing long videos can be time-consuming, especially with larger models.
--   **Windows Paths:** If you encounter issues with file paths on Windows, try enclosing the path in double quotes.
+- **GPU Acceleration:** For significantly faster processing, ensure you have CUDA installed to enable GPU acceleration
+  for the Whisper models.
+- **Processing Time:** Transcribing long videos can be time-consuming, especially with larger models. Using
+  `--extract-audio` can speed up this step.
+- **Windows Paths:** If you encounter issues with file paths on Windows, try enclosing the path in double quotes.
 
 ---
 
@@ -162,7 +189,7 @@ audiobaked/
 -   [ ] Implement transcript chunking for deeper GPT analysis of long files.
 -   [ ] Develop a simple web UI for easy drag-and-drop functionality.
 -   [ ] Add a command-line flag to specify the transcription language.
--   [ ] Provide an option to save the GPT analysis to a file (e.g., JSON or TXT).
+-   [ ] Provide an option to save the GPT analysis to a Markdown file.
 
 ---
 

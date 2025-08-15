@@ -1,5 +1,4 @@
 import os
-import sys
 import argparse
 import subprocess
 import whisper
@@ -7,6 +6,24 @@ import openai
 
 # === ENVIRONMENT CONFIG ===
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+
+def extract_audio(video_path, output_dir):
+    basename = os.path.splitext(os.path.basename(video_path))[0]
+    audio_path = os.path.join(output_dir, f"{basename}.mp3")
+
+    print("🎧 Extracting audio using ffmpeg...")
+    subprocess.run([
+        "ffmpeg",
+        "-i", video_path,
+        "-q:a", "0",
+        "-map", "a",
+        audio_path,
+        "-y"  # overwrite without asking
+    ], check=True)
+
+    print(f"✅ Audio saved to: {audio_path}")
+    return audio_path
 
 
 def transcribe(file_path, model_size):
@@ -94,6 +111,7 @@ def main():
     parser = argparse.ArgumentParser(description="🍃 AudioBaked: Transcribe, burn, and analyze audio & video files.")
 
     parser.add_argument("file", help="Path to the video or audio file")
+    parser.add_argument("--extract-audio", action="store_true", help="Extract audio from video before processing")
     parser.add_argument("--burn", action="store_true", help="Burn subtitles into the video")
     parser.add_argument("--export-only", action="store_true", help="Only export the transcript (.srt and .txt)")
     parser.add_argument("--analyze", action="store_true", help="Send transcript to OpenAI for analysis")
@@ -102,11 +120,16 @@ def main():
 
     args = parser.parse_args()
 
-    srt_path, txt_path, transcript = transcribe(args.file, args.model)
+    input_path = args.file
+
+    if args.extract_audio:
+        input_path = extract_audio(args.file, args.output_dir)
+
+    srt_path, txt_path, transcript = transcribe(input_path, args.model)
 
     if args.export_only:
         print("🗃️ Export-only mode enabled. Skipping video rendering.")
-    elif args.burn:
+    elif args.burn and not args.extract_audio:
         burn_subtitles(args.file, srt_path, args.output_dir)
 
     if args.analyze:
