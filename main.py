@@ -4,7 +4,6 @@ import subprocess
 import whisper
 from openai import OpenAI
 
-client = OpenAI(api_key=OPENAI_API_KEY)
 from rich.console import Console
 from dotenv import load_dotenv
 
@@ -16,6 +15,8 @@ console = Console()
 # === ENVIRONMENT CONFIG ===
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 SYSTEM_PROMPT = os.getenv("OPENAI_SYSTEM_PROMPT", "You are a helpful assistant. Analyze the following transcript.")
+
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 
 def extract_audio(video_path, output_dir):
@@ -36,14 +37,14 @@ def extract_audio(video_path, output_dir):
     return audio_path
 
 
-def transcribe(file_path, model_size):
+def transcribe(file_path, model_size, output_dir):
     console.print(f"🎤 [bold cyan]Transcribing with Whisper ({model_size})...[/bold cyan]")
     model = whisper.load_model(model_size)
     result = model.transcribe(file_path, fp16=False)
 
     basename = os.path.splitext(os.path.basename(file_path))[0]
-    srt_path = f"{basename}.srt"
-    txt_path = f"{basename}.txt"
+    srt_path = os.path.join(output_dir, f"{basename}.srt")
+    txt_path = os.path.join(output_dir, f"{basename}.txt")
 
     with open(srt_path, "w", encoding="utf-8") as srt_file, open(txt_path, "w", encoding="utf-8") as txt_file:
         for i, segment in enumerate(result['segments']):
@@ -85,10 +86,11 @@ def analyze_transcript(text, basename, output_dir):
     console.print("🤖 [bold cyan]Sending transcript to OpenAI for analysis...[/bold cyan]")
 
     response = client.chat.completions.create(model="gpt-4",
-    messages=[
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": f"Analyze this transcript:\n\n{text[:8000]}"}
-    ])
+                                              messages=[
+                                                  {"role": "system", "content": SYSTEM_PROMPT},
+                                                  {"role": "user",
+                                                   "content": f"Analyze this transcript:\n\n{text[:8000]}"}
+                                              ])
 
     analysis = response.choices[0].message.content
 
@@ -114,23 +116,28 @@ def main():
     parser.add_argument("--export-only", action="store_true", help="Only export the transcript (.srt and .txt)")
     parser.add_argument("--analyze", action="store_true", help="Send transcript to OpenAI for analysis")
     parser.add_argument("--model", default="medium", help="Whisper model size (tiny, base, small, medium, large)")
-    parser.add_argument("--output-dir", default=".", help="Directory for output files")
+    parser.add_argument("--output-dir", default="output", help="Directory for output files")
 
     args = parser.parse_args()
     input_path = args.file
 
-    if args.extract_audio:
-        input_path = extract_audio(args.file, args.output_dir)
+    # Create execution subfolder based on file name
+    input_basename = os.path.splitext(os.path.basename(input_path))[0]
+    execution_dir = os.path.join(args.output_dir, input_basename)
+    os.makedirs(execution_dir, exist_ok=True)
 
-    srt_path, txt_path, transcript, basename = transcribe(input_path, args.model)
+    if args.extract_audio:
+        input_path = extract_audio(input_path, execution_dir)
+
+    srt_path, txt_path, transcript, basename = transcribe(input_path, args.model, execution_dir)
 
     if args.export_only:
         console.print("🗃️ [yellow]Export-only mode enabled. Skipping video rendering.[/yellow]")
     elif args.burn and not args.extract_audio:
-        burn_subtitles(args.file, srt_path, args.output_dir)
+        burn_subtitles(args.file, srt_path, execution_dir)
 
     if args.analyze:
-        analyze_transcript(transcript, basename, args.output_dir)
+        analyze_transcript(transcript, basename, execution_dir)
 
 
 if __name__ == "__main__":
