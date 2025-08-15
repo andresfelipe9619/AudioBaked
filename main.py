@@ -4,6 +4,9 @@ import subprocess
 import whisper
 import openai
 from rich.console import Console
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # === RICH CONSOLE INITIALIZATION ===
 console = Console()
