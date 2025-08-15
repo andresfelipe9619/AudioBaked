@@ -66,11 +66,24 @@ def analyze_transcript(text):
 
     print("🤖 Sending transcript to OpenAI for analysis...")
     openai.api_key = OPENAI_API_KEY
+
+    system_prompt = """You are a top-tier business analyst and project manager. Your task is to analyze the following transcript and extract key information for a freelancer.
+
+Please provide the following, based on the content of the conversation:
+
+1.  **General Notes:** A summary of the key topics discussed, decisions made, and important information mentioned.
+2.  **Action Items:** A clear list of tasks that need to be completed, with assigned owners if mentioned.
+3.  **Freelancer's To-Do List:** A specific, actionable list of tasks for the freelancer based on the conversation.
+4.  **Estimated Time & Budget:** A clever and realistic estimation of the time (in hours or days) and budget required for the project discussed. If not explicitly mentioned, provide a reasonable estimate based on the scope of work.
+
+Format the output in Markdown.
+"""
+
     response = openai.ChatCompletion.create(
         model="gpt-4",
         messages=[
-            {"role": "system", "content": "You are a helpful assistant analyzing transcribed audio."},
-            {"role": "user", "content": f"Analyze this transcript:\n\n{text[:4000]}"}  # Truncated
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": f"Analyze this transcript:\n\n{text[:8000]}"}
         ]
     )
     print("🧠 Analysis:")
