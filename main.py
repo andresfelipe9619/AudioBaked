@@ -117,8 +117,23 @@ def main():
     parser.add_argument("--analyze", action="store_true", help="Send transcript to OpenAI for analysis")
     parser.add_argument("--model", default="medium", help="Whisper model size (tiny, base, small, medium, large)")
     parser.add_argument("--output-dir", default="output", help="Directory for output files")
+    parser.add_argument("--analyze-transcript", help="Path to an existing transcript (.txt) file to analyze directly")
 
     args = parser.parse_args()
+
+    if args.analyze_transcript:
+        if not os.path.isfile(args.analyze_transcript):
+            console.print(f"❌ [red]File not found:[/red] {args.analyze_transcript}")
+            return
+
+        with open(args.analyze_transcript, "r", encoding="utf-8") as f:
+            transcript_text = f.read()
+
+        basename = os.path.splitext(os.path.basename(args.analyze_transcript))[0]
+        output_dir = os.path.dirname(args.analyze_transcript)
+        analyze_transcript(transcript_text, basename, output_dir)
+        return
+
     input_path = args.file
 
     # Create execution subfolder based on file name
