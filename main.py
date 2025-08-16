@@ -2,10 +2,14 @@ import os
 import argparse
 import subprocess
 import whisper
-from openai import OpenAI
 
 from rich.console import Console
 from dotenv import load_dotenv
+
+from openai import OpenAI
+from openai.types.chat import (
+    ChatCompletionMessageParam
+)
 
 load_dotenv()
 
@@ -85,12 +89,13 @@ def analyze_transcript(text, basename, output_dir):
 
     console.print("🤖 [bold cyan]Sending transcript to OpenAI for analysis...[/bold cyan]")
 
-    response = client.chat.completions.create(model="gpt-4",
-                                              messages=[
-                                                  {"role": "system", "content": SYSTEM_PROMPT},
-                                                  {"role": "user",
-                                                   "content": f"Analyze this transcript:\n\n{text[:8000]}"}
-                                              ])
+    response = client.chat.completions.create(
+        model="gpt-5",
+        messages=[
+            ChatCompletionMessageParam(role="system", content=SYSTEM_PROMPT),
+            ChatCompletionMessageParam(role="user", content=f"Analyze this transcript:\n\n{text[:8000]}")
+        ]
+    )
 
     analysis = response.choices[0].message.content
 
