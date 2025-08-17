@@ -1,5 +1,7 @@
 python-dotenv
-openai-whisper
 openai
-whisper
 rich
+git+https://github.com/m-bain/whisperx.git
+torch
+torchaudio
+pyannote.audio

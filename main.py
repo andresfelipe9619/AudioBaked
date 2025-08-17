@@ -1,15 +1,14 @@
 import os
 import argparse
 import subprocess
-import whisper
+import whisperx
+import gc
+import torch
 
 from rich.console import Console
 from dotenv import load_dotenv
 
 from openai import OpenAI
-from openai.types.chat import (
-    ChatCompletionMessageParam
-)
 
 load_dotenv()
 
@@ -19,8 +18,9 @@ console = Console()
 # === ENVIRONMENT CONFIG ===
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 SYSTEM_PROMPT = os.getenv("OPENAI_SYSTEM_PROMPT", "You are a helpful assistant. Analyze the following transcript.")
+HF_TOKEN = os.getenv("HF_TOKEN")
 
-client = OpenAI(api_key=OPENAI_API_KEY)
+client = OpenAI(api_key=OPENAI_API_KEY, organization='org-qPPnFHcb5d0VwRZifsoowERO')
 
 
 def extract_audio(video_path, output_dir):
@@ -42,22 +42,66 @@ def extract_audio(video_path, output_dir):
 
 
 def transcribe(file_path, model_size, output_dir):
-    console.print(f"🎤 [bold cyan]Transcribing with Whisper ({model_size})...[/bold cyan]")
-    model = whisper.load_model(model_size)
-    result = model.transcribe(file_path, fp16=False)
+    console.print(f"🎤 [bold cyan]Transcribing with WhisperX ({model_size})...[/bold cyan]")
+
+    if not HF_TOKEN:
+        console.print("""
+        [bold red]Error: Hugging Face token not found.[/bold red]
+
+        The diarization feature requires a Hugging Face authentication token.
+
+        1.  Visit [link=https://hf.co/settings/tokens]https://hf.co/settings/tokens[/link] to create an access token.
+        2.  Accept the user conditions for the model at [link=https://hf.co/pyannote/segmentation-3.0]https://hf.co/pyannote/segmentation-3.0[/link].
+        3.  Create a file named `.env` in the same directory as `main.py` and add the following line:
+            HF_TOKEN='your_token_here'
+        """)
+        exit(1)
+    
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    compute_type = "float16" if torch.cuda.is_available() else "int8"
+    
+    # 1. Transcribe with original whisper (batched)
+    model = whisperx.load_model(model_size, device, compute_type=compute_type)
+    audio = whisperx.load_audio(file_path)
+    result = model.transcribe(audio, batch_size=16)
+    
+    # Clean up model
+    gc.collect()
+    torch.cuda.empty_cache()
+    del model
+
+    # 2. Align whisper output
+    model_a, metadata = whisperx.load_align_model(language_code=result["language"], device=device)
+    result = whisperx.align(result["segments"], model_a, metadata, audio, device, return_char_alignments=False)
+
+    # Clean up model_a
+    gc.collect()
+    torch.cuda.empty_cache()
+    del model_a
+
+    # 3. Assign speaker labels
+    diarize_model = whisperx.diarize.DiarizationPipeline(use_auth_token=HF_TOKEN, device=device)
+    diarize_segments = diarize_model(audio)
+    result = whisperx.assign_word_speakers(diarize_segments, result)
 
     basename = os.path.splitext(os.path.basename(file_path))[0]
     srt_path = os.path.join(output_dir, f"{basename}.srt")
     txt_path = os.path.join(output_dir, f"{basename}.txt")
 
+    transcript_for_analysis = []
     with open(srt_path, "w", encoding="utf-8") as srt_file, open(txt_path, "w", encoding="utf-8") as txt_file:
         for i, segment in enumerate(result['segments']):
             start, end, text = segment['start'], segment['end'], segment['text'].strip()
-            srt_file.write(f"{i + 1}\n{format_time(start)} --> {format_time(end)}\n{text}\n\n")
-            txt_file.write(f"{text}\n")
+            speaker = segment.get('speaker', 'SPEAKER_UNKNOWN')
+            line = f"{speaker}: {text}"
+            srt_file.write(f"{i + 1}\n{format_time(start)} --> {format_time(end)}\n{line}\n\n")
+            txt_file.write(f"{line}\n")
+            transcript_for_analysis.append(line)
+
+    full_transcript = "\n".join(transcript_for_analysis)
 
     console.print(f"✅ [bold green]Transcript saved to {srt_path} and {txt_path}[/bold green]")
-    return srt_path, txt_path, result['text'], basename
+    return srt_path, txt_path, full_transcript, basename
 
 
 def format_time(seconds):
@@ -90,10 +134,10 @@ def analyze_transcript(text, basename, output_dir):
     console.print("🤖 [bold cyan]Sending transcript to OpenAI for analysis...[/bold cyan]")
 
     response = client.chat.completions.create(
-        model="gpt-5",
+        model="o4-mini",
         messages=[
-            ChatCompletionMessageParam(role="system", content=SYSTEM_PROMPT),
-            ChatCompletionMessageParam(role="user", content=f"Analyze this transcript:\n\n{text[:8000]}")
+            {"role": "developer", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": f"Analyze this transcript:\n\n{text[:8000]}"}
         ]
     )
 
@@ -115,7 +159,7 @@ def analyze_transcript(text, basename, output_dir):
 def main():
     parser = argparse.ArgumentParser(description="🍃 AudioBaked: Transcribe, burn, and analyze audio & video files.")
 
-    parser.add_argument("file", help="Path to the video or audio file")
+    parser.add_argument("file", nargs='?', default=None, help="Path to the video or audio file")
     parser.add_argument("--extract-audio", action="store_true", help="Extract audio from video before processing")
     parser.add_argument("--burn", action="store_true", help="Burn subtitles into the video")
     parser.add_argument("--export-only", action="store_true", help="Only export the transcript (.srt and .txt)")
@@ -139,6 +183,11 @@ def main():
         analyze_transcript(transcript_text, basename, output_dir)
         return
 
+    if not args.file:
+        parser.print_help()
+        console.print("\n❌ [red]Error:[/red] You must provide a file path or use the --analyze-transcript option.")
+        return
+
     input_path = args.file
 
     # Create execution subfolder based on file name
@@ -158,6 +207,7 @@ def main():
 
     if args.analyze:
         analyze_transcript(transcript, basename, execution_dir)
+
 
 
 if __name__ == "__main__":
