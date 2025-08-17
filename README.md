@@ -1,24 +1,20 @@
 # 🎧 AudioBaked
 
-> Transcribe, analyze, and subtitle your audio & video files directly from the command line.
+> Transcribe, analyze, and subtitle your audio & video files with speaker diarization, directly from the command line.
 
-**AudioBaked** is a powerful and flexible Python tool for automated transcription and intelligent analysis of your media
-files. It leverages the cutting-edge accuracy of [OpenAI's Whisper](https://github.com/openai/whisper) to generate
-transcripts and can optionally use OpenAI's GPT models to provide insightful, structured analysis.
+**AudioBaked** is a powerful and flexible Python tool for automated transcription and intelligent analysis of your media files. It leverages the cutting-edge accuracy of [WhisperX](https://github.com/m-bain/whisperX) to generate speaker-separated transcripts and can optionally use OpenAI's GPT models to provide insightful, structured analysis.
 
-With its modular CLI interface, you can choose to extract audio, burn subtitles, export transcripts, or run a detailed
-business analysis with simple flags.
+With its modular CLI interface, you can choose to extract audio, burn subtitles, export transcripts, or run a detailed business analysis with simple flags.
 
 ---
 
 ## ✨ Features
 
 - **🎙️ Broad File Support:** Works seamlessly with `.mp4`, `.mov`, `.mp3`, and other common audio/video formats.
-- **🎧 Audio Extraction:** Includes a new `--extract-audio` flag to pull the audio from a video file into a separate
-  `.mp3` for faster processing.
-- **🤖 High-Quality Transcription:** Utilizes OpenAI Whisper for accurate speech-to-text conversion.
-- **🧠 Advanced Business Analysis:** When using the `--analyze` flag, the transcript is sent to a GPT model with a
-  specialized prompt to extract:
+- **🗣️ Speaker Diarization:** Uses WhisperX to identify and label different speakers in the transcript (e.g., `SPEAKER_01`, `SPEAKER_02`).
+- **🎧 Audio Extraction:** Includes a new `--extract-audio` flag to pull the audio from a video file into a separate `.mp3` for faster processing.
+- **🤖 High-Quality Transcription:** Utilizes WhisperX for accurate speech-to-text conversion.
+- **🧠 Advanced Business Analysis:** When using the `--analyze` flag, the transcript is sent to a GPT model with a specialized prompt to extract:
     - **General Notes & Summaries**
     - **Action Items**
     - **A Freelancer's To-Do List**
@@ -28,8 +24,7 @@ business analysis with simple flags.
     - **`--burn`**: Burn subtitles directly into your original video file using `ffmpeg`.
     - **`--export-only`**: Save `.srt` and `.txt` transcript files without creating a new video.
 - **⚙️ Flexible & Controllable:**
-    - **`--model`**: Select the Whisper model size (`tiny`, `base`, `small`, `medium`, `large`) to balance speed and
-      accuracy.
+    - **`--model`**: Select the Whisper model size (`tiny`, `base`, `small`, `medium`, `large`) to balance speed and accuracy.
     - **`--output-dir`**: Specify a custom directory for all output files. Subdirectories are created per file.
 
 ---
@@ -39,6 +34,7 @@ business analysis with simple flags.
 - Python 3.9 or higher
 - `ffmpeg` installed and available in your system's PATH
 - An OpenAI API key (only required for the `--analyze` feature)
+- A Hugging Face User Access Token (for speaker diarization)
 
 ---
 
@@ -80,7 +76,7 @@ pip install -r requirements.txt
 Alternatively, you can install the packages manually:
 
 ```bash
-pip install openai-whisper openai python-dotenv rich
+pip install openai python-dotenv rich torch whisperx
 ```
 
 ---
@@ -89,13 +85,18 @@ pip install openai-whisper openai python-dotenv rich
 
 **🔐 Environment Variables**
 
-To use the `--analyze` feature, you must set your OpenAI API key as an environment variable.
+To use the analysis and diarization features, you must set your API keys as environment variables.
 
-Create a `.env` file in the project's root directory and add your key:
+Create a `.env` file in the project's root directory and add your keys:
 
 ```
 OPENAI_API_KEY="sk-xxxxxx..."
+HF_TOKEN="your_hugging_face_token"
 ```
+
+- **OpenAI:** Required for the `--analyze` feature.
+- **Hugging Face:** Required for speaker diarization. You can get a token from [hf.co/settings/tokens](https://hf.co/settings/tokens). You will also need to accept the user conditions for the [pyannote/segmentation-3.0](https://hf.co/pyannote/segmentation-3.0) model.
+
 
 You can also optionally override the system prompt used for GPT analysis:
 
@@ -107,6 +108,7 @@ Alternatively, you can export the variable directly in your terminal session bef
 
 ```bash
 export OPENAI_API_KEY="sk-xxxxxx..."
+export HF_TOKEN="your_hugging_face_token"
 ```
 
 ---
@@ -171,8 +173,8 @@ python main.py dummy --analyze-transcript ./transcripts/meeting_notes.txt
 Based on the flags you use, the following files may be created inside an output subfolder:
 
 - `yourfile.mp3`: The extracted audio file (created with `--extract-audio`).
-- `yourfile.srt`: A standard subtitle file.
-- `yourfile.txt`: A plain text version of the transcript.
+- `yourfile.srt`: A standard subtitle file with speaker labels.
+- `yourfile.txt`: A plain text version of the transcript with speaker labels.
 - `yourfile_subtitled.mp4`: The final video with burned-in subtitles (created with `--burn`).
 - `yourfile_analysis.md`: Markdown report from GPT (created with `--analyze`).
 
@@ -191,10 +193,8 @@ audiobaked/
 
 ## 💡 Tips & Notes
 
-- **GPU Acceleration:** For significantly faster processing, ensure you have CUDA installed to enable GPU acceleration
-  for the Whisper models.
-- **Processing Time:** Transcribing long videos can be time-consuming, especially with larger models. Using
-  `--extract-audio` can speed up this step.
+- **GPU Acceleration:** For significantly faster processing, ensure you have a CUDA-compatible GPU and the necessary drivers installed. This will enable GPU acceleration for WhisperX.
+- **Processing Time:** Transcribing long videos can be time-consuming, especially with larger models. Using `--extract-audio` can speed up this step.
 - **Windows Paths:** If you encounter issues with file paths on Windows, try enclosing the path in double quotes.
 
 ---
