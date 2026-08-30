@@ -20,7 +20,14 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 SYSTEM_PROMPT = os.getenv("OPENAI_SYSTEM_PROMPT", "You are a helpful assistant. Analyze the following transcript.")
 HF_TOKEN = os.getenv("HF_TOKEN")
 
-client = OpenAI(api_key=OPENAI_API_KEY, organization='org-qPPnFHcb5d0VwRZifsoowERO')
+_client = None
+
+
+def get_client():
+    global _client
+    if _client is None:
+        _client = OpenAI(api_key=OPENAI_API_KEY, organization='org-qPPnFHcb5d0VwRZifsoowERO')
+    return _client
 
 
 def extract_audio(video_path, output_dir):
@@ -46,17 +53,16 @@ def transcribe(file_path, model_size, output_dir):
 
     if not HF_TOKEN:
         console.print("""
-        [bold red]Error: Hugging Face token not found.[/bold red]
+        [bold yellow]Warning: Hugging Face token not found.[/bold yellow]
 
-        The diarization feature requires a Hugging Face authentication token.
+        Speaker diarization will be skipped (all lines labelled SPEAKER_UNKNOWN).
 
         1.  Visit [link=https://hf.co/settings/tokens]https://hf.co/settings/tokens[/link] to create an access token.
         2.  Accept the user conditions for the model at [link=https://hf.co/pyannote/segmentation-3.0]https://hf.co/pyannote/segmentation-3.0[/link].
         3.  Create a file named `.env` in the same directory as `main.py` and add the following line:
             HF_TOKEN='your_token_here'
         """)
-        exit(1)
-    
+
     device = "cuda" if torch.cuda.is_available() else "cpu"
     compute_type = "float16" if torch.cuda.is_available() else "int8"
     
@@ -80,9 +86,10 @@ def transcribe(file_path, model_size, output_dir):
     del model_a
 
     # 3. Assign speaker labels
-    diarize_model = whisperx.diarize.DiarizationPipeline(use_auth_token=HF_TOKEN, device=device)
-    diarize_segments = diarize_model(audio)
-    result = whisperx.assign_word_speakers(diarize_segments, result)
+    if HF_TOKEN:
+        diarize_model = whisperx.diarize.DiarizationPipeline(use_auth_token=HF_TOKEN, device=device)
+        diarize_segments = diarize_model(audio)
+        result = whisperx.assign_word_speakers(diarize_segments, result)
 
     basename = os.path.splitext(os.path.basename(file_path))[0]
     srt_path = os.path.join(output_dir, f"{basename}.srt")
@@ -133,7 +140,7 @@ def analyze_transcript(text, basename, output_dir):
 
     console.print("🤖 [bold cyan]Sending transcript to OpenAI for analysis...[/bold cyan]")
 
-    response = client.chat.completions.create(
+    response = get_client().chat.completions.create(
         model="o4-mini",
         messages=[
             {"role": "developer", "content": SYSTEM_PROMPT},
